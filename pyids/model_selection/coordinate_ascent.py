@@ -72,6 +72,31 @@ class CoordinateAscent(ParameterSpaceOptimizer):
 
             self.func_args_ranges[arg_name] = lower_interval_value, new_upper_interval_value
 
+    def fit_1lambda(self, arg_name):
+        current_params = self.sample_starting_params()
+        arg_func = self.make_1arg_func(arg_name, current_params)
+
+        print(f"using precision {self.ternary_search_precision[arg_name]} for {arg_name}")
+
+        interval_lower, interval_upper = self.func_args_ranges[arg_name]
+        best_param = _ternary_search(
+            arg_func,
+            interval_lower,
+            interval_upper,
+            self.ternary_search_precision[arg_name]
+        )
+
+        self.extend_interval(arg_name, best_param)
+
+        _, interval_upper_new = self.func_args_ranges[arg_name]
+
+        if interval_upper == interval_upper_new:
+            self.ternary_search_precision[arg_name] /= 2
+
+        current_params[arg_name] = best_param
+
+        return best_param
+
     def fit(self):
         current_params = self.sample_starting_params()
 

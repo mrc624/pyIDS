@@ -2,10 +2,15 @@ from .param_space_optimizer import ParameterSpaceOptimizer
 from typing import Tuple, Dict, List
 import pandas as pd
 
+AUC_Cutoff = 0.99999
+
 def _ternary_search(func, left, right, absolute_precision, debug=False):
     """
     taken from wikipedia article on ternary search
     """
+
+    best_score = float("-inf")
+    best_val = None
     
     while True:
         if abs(right - left) < absolute_precision:
@@ -17,7 +22,24 @@ def _ternary_search(func, left, right, absolute_precision, debug=False):
         if debug:
             print(left_third, right_third)
 
-        if func(left_third) < func(right_third):
+        fleft = func(left_third)
+        fright = func(right_third)
+
+        if fleft > best_score:
+            best_score = fleft
+            best_val = left_third
+        
+        if fright > best_score:
+            best_score = fright
+            best_val = right_third
+
+        #Exit early due to reaching AUC cutoff, which is useful to speed up optimization when we are already close to the optimal solution
+        if best_score >= AUC_Cutoff:
+            if debug:
+                print(f"Reached AUC cutoff of {AUC_Cutoff} with score {best_score}, exiting early with best val {best_val}")
+            return best_val
+
+        if fleft < fright:
             left = left_third
         else:
             right = right_third
@@ -72,7 +94,7 @@ class CoordinateAscent(ParameterSpaceOptimizer):
 
             self.func_args_ranges[arg_name] = lower_interval_value, new_upper_interval_value
 
-    def fit_1lambda(self, arg_name):
+    def fit_1lambda(self, arg_name): # Custom function to fit a single lambda parameter, keeping the others fixed at the starting values
         current_params = self.sample_starting_params()
         arg_func = self.make_1arg_func(arg_name, current_params)
 
@@ -83,7 +105,8 @@ class CoordinateAscent(ParameterSpaceOptimizer):
             arg_func,
             interval_lower,
             interval_upper,
-            self.ternary_search_precision[arg_name]
+            self.ternary_search_precision[arg_name],
+            debug=True
         )
 
         self.extend_interval(arg_name, best_param)
